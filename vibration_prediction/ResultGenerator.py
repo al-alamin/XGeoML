@@ -104,12 +104,14 @@ class Dataset:
         # print(len(dataset.data_windows))
         
         self.cur_data_window_ind = 0
+        
         if(self.model.does_have_pretrained_weights() is False or len(self.model.all_training_dataset_windows) == 0):
             for i in range(3):
                 self.model.add_new_training_data_window(self.data_windows[self.cur_data_window_ind])
                 self.cur_data_window_ind = self.cur_data_window_ind + 1
                 # print("Skipping testing on this bin: %d" % self.cur_data_window_ind)
             self.model.finetune_model()
+            # self.model.model = self.model.load_model_weights()
         else:
             self.model.model = self.model.load_model_weights()
         # for i in range(3):
@@ -136,7 +138,7 @@ class Dataset:
             df_overall_run_predict = df_overall_run_predict.append(res, ignore_index=True)
 
             self.model.add_new_training_data_window(test_window)
-            break
+            # break
             self.model.finetune_model(prev_data_windows=6)
             
         
@@ -194,8 +196,8 @@ class Dataset:
             for test_bin in test_bins:
                 # print(test_bin)
                 res_df = self.df_overall_run_predict[self.df_overall_run_predict['Test Bin'] == test_bin].iloc[0]
-                print(type(res_df), len(res_df))
-                print(res_df)
+                # print(type(res_df), len(res_df))
+                # print(res_df)
                 y_pred, y_pred_smooth, y_pred_max, y_pred_max_smooth, y_pred_min, y_pred_min_smooth = self.get_parsed_pred_data(res_df)
                 df_tmp = self.df_run_time_bin[self.df_run_time_bin['Bins'] == test_bin]
                 df_tmp['y_pred'] = y_pred_smooth
@@ -225,16 +227,16 @@ class Dataset:
         plt.show()
     
     def get_parsed_pred_data(self, pred_df):
-        print("get_parsed_pred_data")
+        # print("get_parsed_pred_data")
         y_pred = pred_df['y_pred']
-        print(len(y_pred))
+        # print(len(y_pred))
         y_pred_smooth = get_smooth_data(y_pred, N=10)
         y_pred_max = pred_df['y_pred_max']
         y_pred_max_smooth = get_smooth_data(y_pred_max, N=10)
         y_pred_min = pred_df['y_pred_min']
         y_pred_min_smooth = get_smooth_data(y_pred_min, N=10)
         # y_original = pred_df['OriginalValue']
-        print("method over")
+        # print("method over")
 
         return y_pred, y_pred_smooth, y_pred_max, y_pred_max_smooth, y_pred_min, y_pred_min_smooth
 

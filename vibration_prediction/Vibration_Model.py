@@ -93,7 +93,7 @@ class Model:
             (x, y, t) = td
             X.append(x)
             Y.append(y)
-        print(len(X), len(training_data))
+        # print(len(X), len(training_data))
         X_train = pd.concat(X)
         y_train = pd.concat(Y)
         # print(len(X_train), len(y_train))
@@ -116,6 +116,7 @@ class Model:
                 tf.keras.layers.Dense(units=1)
             ])
             return lstm_model
+        
 
     def does_have_pretrained_weights(self):
         model = self.load_model_weights()
@@ -168,7 +169,7 @@ class Model:
             test_ds = TimeSeriesData.make_test_dataset(X_test_normalized, self.time_steps)
             y_pred = self.model.predict(test_ds)
             y_pred = np.clip(y_pred, 0, max(y_pred))
-            y_pred = ([None] * (self.time_steps-1)) + [p[0] for p in y_pred]
+            y_pred = ([0] * (self.time_steps-1)) + [p[0] for p in y_pred]
             y_pred = np.array(y_pred)
 
         return list(y_pred)
