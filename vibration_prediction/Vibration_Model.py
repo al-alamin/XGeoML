@@ -1,0 +1,287 @@
+from copy import deepcopy
+import warnings
+warnings.filterwarnings('always')
+warnings.simplefilter('always')
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+import glob, os, sys
+import numpy as np
+import pandas as pd
+pd.options.mode.chained_assignment = None
+import csv
+import pickle
+import math
+import os
+import traceback
+from datetime import datetime
+from numpy import random
+import statistics
+from collections import OrderedDict
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+
+try:
+    import matplotlib.pylab as plt
+except ImportError:
+    traceback.print_exc()
+
+try:
+    import tensorflow as tf
+except ImportError:
+    traceback.print_exc()
+
+import vibration_prediction.Util as Util
+
+class Model:
+    def __init__(self, model_name, model_path=None):
+        self.model_name = model_name
+        self.all_training_dataset_windows = [] # list of tuple (X_train, y_train)
+        self.autoscaler = None
+
+        if(self.model_name == "LR"):
+            if(model_path is None):
+                self.model_check_point_path = os.path.join("output", "LR.pkl")
+                self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
+            else:
+                self.model_check_point_path = model_path
+
+        if(self.model_name == "RF"):
+            if(model_path is None):
+                self.model_check_point_path = os.path.join("output", "RF.pkl")
+                self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
+            else:
+                self.model_check_point_path = model_path
+
+        if(self.model_name == "LSTM"):
+            if(model_path is None):
+                self.model_check_point_path = os.path.join("output", "LSTM.h5")
+                self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
+            else:
+                self.model_check_point_path = model_path
+            self.time_steps = 10
+
+        if(self.model_name == "LSTM_Forecast"):
+            if(model_path is None):
+                self.model_check_point_path = os.path.join("output", "LSTM_Forecast.h5")
+                self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
+            else:
+                self.model_check_point_path = model_path
+
+        
+        self.model = self.get_model()
+    
+    def add_new_training_data_window(self, new_data_window):
+        # new_data: contains a window of data samples
+        self.all_training_dataset_windows.append(new_data_window)
+
+    def clear_training_data_window(self):
+        self.all_training_dataset_windows = []
+
+    def get_training_dataset(self, prev_window=None):
+        if prev_window == None:
+            prev_window = len(self.all_training_dataset_windows)
+        
+        training_data = self.all_training_dataset_windows[-prev_window:]
+        X = []
+        Y = []
+        for td in training_data:
+            (x, y, t) = td
+            X.append(x)
+            Y.append(y)
+        print(len(X), len(training_data))
+        X_train = pd.concat(X)
+        y_train = pd.concat(Y)
+        # print(len(X_train), len(y_train))
+        return (X_train, y_train)
+
+
+    
+    def get_model(self):
+        if(self.model_name == "LR"):
+            return LinearRegression(normalize=True)
+
+        if(self.model_name == "RF"):
+            return RandomForestRegressor()
+
+        if(self.model_name == "LSTM"):
+            lstm_model = tf.keras.models.Sequential([
+                # Shape [batch, time, features] => [batch, time, lstm_units]
+                tf.keras.layers.LSTM(32, return_sequences=False),
+                # Shape => [batch, time, features]
+                tf.keras.layers.Dense(units=1)
+            ])
+            return lstm_model
+
+    def does_have_pretrained_weights(self):
+        model = self.load_model_weights()
+        return model != None
+
+    def load_model_weights(self):
+        model = None
+        if(self.model_name == "LR"):
+            if os.path.exists(self.model_check_point_path):
+                model = Util.static_load_obj(self.model_check_point_path)         
+
+        if(self.model_name == "RF"):
+            if os.path.exists(self.model_check_point_path):
+                model =  Util.static_load_obj(self.model_check_point_path)
+
+        if(self.model_name == "LSTM"):
+            if os.path.exists(self.model_check_point_path):
+                model = tf.keras.models.load_model(self.model_check_point_path)
+
+        return model
+
+    def save_model_weights(self):
+        if(self.model_name == "LR"):
+            Util.static_save_obj(self.model, self.model_check_point_path)
+        if(self.model_name == "RF"):
+            Util.static_save_obj(self.model, self.model_check_point_path)
+        # if(self.model_name == "LSTM"):
+        #     Util.static_save_obj(self.model, self.model_check_point_path)
+
+
+    def finetune_model(self, prev_data_windows=None):
+        X_train, y_train = self.get_training_dataset(prev_window=prev_data_windows)
+        X_train_normalized = self.get_normalized_train_data(X_train)
+
+        if(self.model_name == "LR" or self.model_name=="RF"):
+            self.model.fit(X_train_normalized, y_train)
+            self.save_model_weights()
+        
+        if(self.model_name == "LSTM"):
+            train_dataset = TimeSeriesData.make_train_dataset(X_train_normalized, y_train,  self.time_steps)
+            self.LSTM_compile_and_fit(train_dataset)
+
+
+
+    def make_prediction(self, X_test):
+        X_test_normalized = self.get_normalized_test_data(X_test)
+        if(self.model_name == "LR" or self.model_name=="RF"):
+            y_pred = self.model.predict(X_test_normalized)
+        if(self.model_name == "LSTM"):
+            test_ds = TimeSeriesData.make_test_dataset(X_test_normalized, self.time_steps)
+            y_pred = self.model.predict(test_ds)
+            y_pred = np.clip(y_pred, 0, max(y_pred))
+            y_pred = ([None] * (self.time_steps-1)) + [p[0] for p in y_pred]
+            y_pred = np.array(y_pred)
+
+        return list(y_pred)
+
+    def get_max_min_range(self, y_pred):
+        X, y = self.get_training_dataset(prev_window=3)
+        prev_SD = statistics.stdev(y)
+
+        y_pred_max = [ d + random.uniform(prev_SD, 3 * prev_SD) for d in y_pred]
+        y_pred_min = [ d - random.uniform(prev_SD, 3 * prev_SD) for d in y_pred]
+        return y_pred_max, y_pred_min
+
+
+    def get_normalized_train_data(self, X_train):
+        X_train = X_train.copy(deep=True)
+        self.autoscaler = StandardScaler()
+        self.autoscaler.fit(X_train)
+        X_train[Util.FEATURES] = self.autoscaler.transform(X_train[Util.FEATURES])
+        Util.static_save_obj(self.autoscaler, self.autoscaler_check_point_path)
+        # X_test[feature_columns] = autoscaler.transform(X_test[feature_columns])
+        return X_train
+
+    def get_normalized_test_data(self, X_test):
+        X_test = X_test.copy(deep=True)
+        if self.autoscaler is None:
+            self.autoscaler = Util.static_load_obj(self.autoscaler_check_point_path)
+        X_test[Util.FEATURES] = self.autoscaler.transform(X_test[Util.FEATURES])
+        return X_test
+        
+    def LSTM_compile_and_fit(self, train_ds, max_epochs = 100, patience=2):
+        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss',
+                                                            patience=patience,
+                                                            mode='min')
+                                                          
+        monitor_it = tf.keras.callbacks.ModelCheckpoint(self.model_check_point_path, monitor='loss',\
+                                                    verbose=0, save_best_only=True,\
+                                                    save_weights_only=False,\
+                                                    mode='min')
+
+        self.model.compile(loss=tf.losses.MeanSquaredError(),
+                        optimizer=tf.optimizers.Adam(),
+                        metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanSquaredLogarithmicError()],
+                        run_eagerly=True
+                        )
+
+        history = self.model.fit(train_ds, epochs=max_epochs, callbacks=[early_stopping, monitor_it], verbose=0)
+        return history
+
+    # def get_prediction_LSTM(self, model_checkpoint_path, skip_training=True, max_epochs=100):
+    #     train_ds, test_ds = self.get_train_test_dataset()
+
+    #     y_pred = self.model.predict(test_ds)
+    #     y_pred = np.clip(y_pred, 0, max(y_pred))
+    #     y_pred = [p[0] for p in y_pred]
+    #     y_pred = np.array(y_pred)
+    #     return y_pred, lstm_model
+
+
+class TimeSeriesData():
+
+
+
+    def make_train_dataset(X, y, time_steps, batch_size=32, ):
+        data = np.array(X, dtype=np.float32)
+        target = np.array(y, dtype=np.float32)
+        ds = tf.keras.utils.timeseries_dataset_from_array(data=data, 
+                                                          targets=target, 
+                                                          sequence_length=time_steps, 
+                                                          sequence_stride=1, 
+                                                          shuffle=True, 
+                                                          batch_size=batch_size)
+        return ds
+
+
+
+    def make_test_dataset(X, time_steps, batch_size=32):
+        data = np.array(X, dtype=np.float32)
+        # target = np.array(y, dtype=np.float32)
+        ds = tf.keras.utils.timeseries_dataset_from_array(data=data, 
+                                                          targets=None, 
+                                                          sequence_length=time_steps, 
+                                                          sequence_stride=1, 
+                                                          shuffle=False, 
+                                                          batch_size=batch_size)
+        return ds
+
+
+    # def get_train_test_dataset(self):
+    #     # Make train dataset
+    #     X = self.X_train.copy()
+    #     y = self.y_train[self.time_steps-1:]
+    #     # print("Len X: %d Len y: %d" % (len(X), len(y)))
+    #     train_ds = self.make_dataset(X, y, suffle=True)
+
+
+    #     # print("Test dataset X: ")
+        
+    #     # Make test dataset
+    #     X = self.X_train.tail(self.time_steps-1)
+    #     # print(self.X_test)
+    #     X = X.append(self.X_test)
+    #     # print(X)
+    #     y = self.y_test
+
+    #     # print("Test dataset Len X: %d Len y: %d" % (len(X), len(y)))
+    #     test_ds = self.make_dataset(X, y, suffle=False)
+
+    #     # for ds in test_ds:
+    #     #     print(ds)
+
+    #     return train_ds, test_ds
+
+
+
+
+
