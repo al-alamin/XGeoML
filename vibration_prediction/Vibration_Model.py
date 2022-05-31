@@ -32,6 +32,7 @@ except ImportError:
 
 try:
     import tensorflow as tf
+    from keras.preprocessing.sequence import TimeseriesGenerator
 except ImportError:
     traceback.print_exc()
 
@@ -71,6 +72,7 @@ class Model:
                 self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
             else:
                 self.model_check_point_path = model_path
+            self.look_back = 10
 
         
         self.model = self.get_model()
@@ -116,7 +118,16 @@ class Model:
                 tf.keras.layers.Dense(units=1)
             ])
             return lstm_model
-        
+
+        if(self.model_name == "LSTM_Forecast"):
+            model = tf.keras.models.Sequential()
+            model.add(
+                tf.keras.layers.LSTM(64,
+                    input_shape=(self.look_back, 1))
+            )
+            model.add(tf.keras.layers.Dense(1))
+            return model
+
 
     def does_have_pretrained_weights(self):
         model = self.load_model_weights()
@@ -149,6 +160,14 @@ class Model:
 
     def finetune_model(self, prev_data_windows=None):
         X_train, y_train = self.get_training_dataset(prev_window=prev_data_windows)
+
+        if(self.model_name == "LSTM_Forecast"):
+            y_train = y_train.tolist()
+            # print(len(y_train), type(y_train), y_train)
+            train_dataset = TimeseriesGenerator(y_train, y_train, length=self.look_back, batch_size=32)
+            self.LSTM_compile_and_fit(train_dataset)
+            return
+
         X_train_normalized = self.get_normalized_train_data(X_train)
 
         if(self.model_name == "LR" or self.model_name=="RF"):
@@ -158,6 +177,8 @@ class Model:
         if(self.model_name == "LSTM"):
             train_dataset = TimeSeriesData.make_train_dataset(X_train_normalized, y_train,  self.time_steps)
             self.LSTM_compile_and_fit(train_dataset)
+
+
 
 
 
@@ -172,6 +193,25 @@ class Model:
             y_pred = ([0] * (self.time_steps-1)) + [p[0] for p in y_pred]
             y_pred = np.array(y_pred)
 
+        if(self.model_name == "LSTM_Forecast"):
+            y_pred = []
+            if(len(self.all_training_dataset_windows) > 0):
+                test_sample = self.all_training_dataset_windows[-1][1].tolist()
+            while (len(y_pred) < len(X_test)):
+                test_sample = test_sample[-(self.look_back+1):]
+                # print(type(test_sample), len(test_sample), test_sample)
+                
+                test_sample = list(Util.get_smooth_data(test_sample, N=2))
+                # print(type(test_sample), len(test_sample), test_sample)
+                
+                
+                test_gen = TimeseriesGenerator(test_sample, test_sample, length=self.look_back)
+                pred = self.model.predict(test_gen)[0][0]
+                # print("Test Sample len: %d" % len(test_sample))
+                y_pred.append(pred)
+                test_sample.append(pred)
+            y_pred = np.clip(y_pred, 0, max(y_pred))
+            # print(y_pred)
         return list(y_pred)
 
     def get_max_min_range(self, y_pred):
@@ -211,26 +251,15 @@ class Model:
 
         self.model.compile(loss=tf.losses.MeanSquaredError(),
                         optimizer=tf.optimizers.Adam(),
-                        metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanSquaredLogarithmicError()],
+                        # metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanSquaredLogarithmicError()],
                         run_eagerly=True
                         )
 
         history = self.model.fit(train_ds, epochs=max_epochs, callbacks=[early_stopping, monitor_it], verbose=0)
         return history
 
-    # def get_prediction_LSTM(self, model_checkpoint_path, skip_training=True, max_epochs=100):
-    #     train_ds, test_ds = self.get_train_test_dataset()
-
-    #     y_pred = self.model.predict(test_ds)
-    #     y_pred = np.clip(y_pred, 0, max(y_pred))
-    #     y_pred = [p[0] for p in y_pred]
-    #     y_pred = np.array(y_pred)
-    #     return y_pred, lstm_model
-
 
 class TimeSeriesData():
-
-
 
     def make_train_dataset(X, y, time_steps, batch_size=32, ):
         data = np.array(X, dtype=np.float32)
@@ -255,32 +284,6 @@ class TimeSeriesData():
                                                           shuffle=False, 
                                                           batch_size=batch_size)
         return ds
-
-
-    # def get_train_test_dataset(self):
-    #     # Make train dataset
-    #     X = self.X_train.copy()
-    #     y = self.y_train[self.time_steps-1:]
-    #     # print("Len X: %d Len y: %d" % (len(X), len(y)))
-    #     train_ds = self.make_dataset(X, y, suffle=True)
-
-
-    #     # print("Test dataset X: ")
-        
-    #     # Make test dataset
-    #     X = self.X_train.tail(self.time_steps-1)
-    #     # print(self.X_test)
-    #     X = X.append(self.X_test)
-    #     # print(X)
-    #     y = self.y_test
-
-    #     # print("Test dataset Len X: %d Len y: %d" % (len(X), len(y)))
-    #     test_ds = self.make_dataset(X, y, suffle=False)
-
-    #     # for ds in test_ds:
-    #     #     print(ds)
-
-    #     return train_ds, test_ds
 
 
 

@@ -1,4 +1,5 @@
 import pickle
+import numpy as np
 
 def static_load_obj(file_path):
     with open(file_path, 'rb') as f:

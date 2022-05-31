@@ -119,8 +119,8 @@ class Dataset:
         
 
         df_overall_run_predict = pd.DataFrame()
-        for test_bin in range(self.cur_data_window_ind, len(self.bins)):
-            if (self.model.model_name == "LSTM"):
+        for test_bin in range(self.cur_data_window_ind, len(self.bins)-1):
+            if (self.model.model_name == "LSTM" or self.model.model_name == "LSTM_Forecast"):
                 print("Test bin: %d" % test_bin)
             test_window = self.data_windows[test_bin]
             y_pred = self.model.make_prediction(test_window[0]) # window = (X, y, t)
@@ -139,7 +139,10 @@ class Dataset:
 
             self.model.add_new_training_data_window(test_window)
             # break
-            self.model.finetune_model(prev_data_windows=6)
+            if(self.model.model_name == "LSTM_Forecast"):
+                self.model.finetune_model(prev_data_windows=3)
+            else:
+                self.model.finetune_model(prev_data_windows=6)
             
         
         self.df_overall_run_predict = df_overall_run_predict
