@@ -20,25 +20,16 @@ from datetime import datetime
 from numpy import random
 import statistics
 from collections import OrderedDict
-
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
+import tensorflow as tf
+from keras.preprocessing.sequence import TimeseriesGenerator
 
-try:
-    import matplotlib.pylab as plt
-except ImportError:
-    traceback.print_exc()
-
-try:
-    import tensorflow as tf
-    from keras.preprocessing.sequence import TimeseriesGenerator
-except ImportError:
-    traceback.print_exc()
 
 import vibration_prediction.Util as Util
 
-class Model:
+class VibrationML:
     def __init__(self, model_name, model_path=None):
         self.model_name = model_name
         self.all_training_dataset_windows = [] # list of tuple (X_train, y_train)
