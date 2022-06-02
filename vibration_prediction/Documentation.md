@@ -1,6 +1,3 @@
-aa
-
-
 # Vibration Prediction model
 
 
@@ -17,6 +14,61 @@ aa
 
 
 ## VibrationML
+
+
+## Terminology
+* Feature: Feature is a tuple of values, e.g., (ROP, Torque, Weight on bits). This can contain any number of features.
+* Data Point: It is a tuple of (features, target variable), e.g., ((torque, weight_on_bits, rop), vibration_values).
+* Data Window: A data window is basically a list of datapoints which can be 1, 10, 60, 600 etc
+
+
+
+## API description
+* VibrationML(model_name): Here the model_name is:
+    * LR -> For linear regression model
+    * RF -> For Random Forrest model
+    * LSTM -> For LSTM based RNN model
+
+* add_new_training_data_window(new_data_window)
+     * As new data points keep on coming in real time, we can put them inside a temporary list and when there are sufficient data points (e.g., 600) we can put them inside the model for finetuning.
+
+* finetune_model(prev_data_windows=None)
+    * This method is supposed to call after adding new data window via add_new_training_data_window() method.
+    * if prev_data_windows is None then all the previous datapoints are used for finetuing. But in many cases we may need to finetune the model only on previous few datapoints (i.e., 1 to 6 data windows which may signify last 10 min to 1 hour of drilling).
+
+* make_prediction(X_test):
+    * X_test is a list which may contain only one data points, e.g., (ROP, Torque, Weight on bits)
+    * So one use case is as drilling keeps on going the groud values keeps on coming and this make_prediction() method can be used to make prediction on the downhole target parameter, i.e., vibration.
+
+* save_model_weights(model_path=None): 
+    * If model path is not provided then the weights of the models will be stored in default path. Different file name is useful for future explanability analysis
+
+* load_model_weights(model_path=None):
+    *  If model path is not provided then the weights of the models will be loaded from the default path.
+
+
+<br>
+
+## Usage Example
+Sudo code is added for now. For actual code reference see ResultGenerator.py. **Library code is updated frequence so name of methods and parameters may be different**
+
+model = VibrationML("LR") # initializing linear regression model <br>
+data_window = prepareData() # data_window is a list of datapoints, e.g., [(ROP, weight_bits, Torque), vibration_values] <br>
+model.add_new_training_data_window(new_data_window = data_window) <br>
+model.finetune_model(prev_data_windows=1) # if there are more data_windows are added then this value can be more than 1 <br>
+new_test_data = prepareData() # it is a list of data samples, e.g., [(ROP, weight_bits, Torque)]
+predicted_vibrations = model.make_prediction(X_test = new_test_data) <br>
+\# print_and_visualize_prediction(predicted_vibrations)
+
+
+<br><br><br>
+## Todo
+
+* Need to implement features to store training dataset to files so that it can handle server restart.
+* Data interprolation method needs to be implemented in case the downhole sample rate is less than the sample rate of the feature variables.
+* Refactor the code to make it more modular
+* Add more code comments.
+
 
 
 
