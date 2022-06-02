@@ -210,6 +210,7 @@ class VibrationML:
         return list(y_pred)
 
     def get_max_min_range(self, y_pred):
+        # Needs to update the heuristics on this model
         X, y = self.get_training_dataset(prev_window=3)
         prev_SD = statistics.stdev(y)
 

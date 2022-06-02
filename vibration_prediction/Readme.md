@@ -46,6 +46,9 @@
 * load_model_weights(model_path=None):
     *  If model path is not provided then the weights of the models will be loaded from the default path.
 
+* get_max_min_range(y_pred):
+    * [Todo] Needs to update the algorithms to improve preformance
+    * Currently it considers the Standard deviation of the vibration of the past W=3 data_windows and uses it to make some prediction on the higher end and the lower end range of the prediction.
 
 <br>
 
@@ -57,8 +60,9 @@ data_window = prepareData() # data_window is a list of datapoints, e.g., [(ROP, 
 model.add_new_training_data_window(new_data_window = data_window) <br>
 model.finetune_model(prev_data_windows=1) # if there are more data_windows are added then this value can be more than 1 <br>
 new_test_data = prepareData() # it is a list of data samples, e.g., [(ROP, weight_bits, Torque)]
-predicted_vibrations = model.make_prediction(X_test = new_test_data) <br>
-\# print_and_visualize_prediction(predicted_vibrations)
+predicted_vibrations = predicted_vibrations = model.make_prediction(X_test = new_test_data) <br>
+y_pred_max, y_pred_min = self.model.get_max_min_range(predicted_vibrations) <br>
+\# print_and_visualize_prediction(predicted_vibrations, y_pred_max, y_pred_min)
 
 
 <br><br><br>
