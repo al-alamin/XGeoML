@@ -17,7 +17,7 @@
 
 
 ## Terminology
-* Feature: Feature is a tuple of values, e.g., (ROP, Torque, Weight on bits). This can contain any number of features.
+* Feature: Feature is a tuple of values, e.g., (ROP, Torque, Weight on bits). This can contain any number of features. In the future we can incorporate the time_stamp as a part of this touple for future usecase.
 * Data Point: It is a tuple of (features, target variable), e.g., ((torque, weight_on_bits, rop), vibration_values).
 * Data Window: A data window is basically a list of datapoints which can be 1, 10, 60, 600 etc
 
@@ -53,16 +53,30 @@
 <br>
 
 ## Usage Example
-Sudo code is added for now. For actual code reference see ResultGenerator.py. **Library code is updated frequence so name of methods and parameters may be different**
+Sudo code is added for now. For sample usage refer to the sample_usage.py file on how to use this library. Please refer to ResultGenerator.py which is used to generate the graphs used to present the performance of these ML models presented in the powerpoint presentation.. **Library code is updated frequence so name of methods and parameters may be different**
+
+
+\# *Data Pipeline* (Sample.py for details)
+
+data_window = prepareData() # data_window is a list of datapoints, e.g., [(ROP, weight_bits, Torque), vibration_values] <br>
+new_test_data = prepareData() # it is a list of data samples, e.g., [(ROP, weight_bits, Torque)]
+
+
+\# *Model Finetuning* (Sample.py for details)
 
 model = VibrationML("LR") # initializing linear regression model <br>
-data_window = prepareData() # data_window is a list of datapoints, e.g., [(ROP, weight_bits, Torque), vibration_values] <br>
 model.add_new_training_data_window(new_data_window = data_window) <br>
 model.finetune_model(prev_data_windows=1) # if there are more data_windows are added then this value can be more than 1 <br>
-new_test_data = prepareData() # it is a list of data samples, e.g., [(ROP, weight_bits, Torque)]
-predicted_vibrations = predicted_vibrations = model.make_prediction(X_test = new_test_data) <br>
+
+\# *Model Prediction* (Sample.py for details)
+
+predicted_vibrations = model.make_prediction(X_test = new_test_data) <br>
 y_pred_max, y_pred_min = self.model.get_max_min_range(predicted_vibrations) <br>
 \# print_and_visualize_prediction(predicted_vibrations, y_pred_max, y_pred_min)
+
+
+\# *Prediction Analysis* (Sample.py for details)
+You need to write your own code to analyse the performance and the visualization of the predicted values which is out of the scope of this library.
 
 
 <br><br><br>

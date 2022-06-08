@@ -27,7 +27,7 @@ import tensorflow as tf
 from keras.preprocessing.sequence import TimeseriesGenerator
 
 
-import vibration_prediction.Util as Util
+from Util import Util
 
 class VibrationML:
     def __init__(self, model_name, model_path=None):
@@ -37,6 +37,7 @@ class VibrationML:
 
         if(self.model_name == "LR"):
             if(model_path is None):
+                Util.create_directory("output")
                 self.model_check_point_path = os.path.join("output", "LR.pkl")
                 self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
             else:
@@ -44,6 +45,7 @@ class VibrationML:
 
         if(self.model_name == "RF"):
             if(model_path is None):
+                Util.create_directory("output")
                 self.model_check_point_path = os.path.join("output", "RF.pkl")
                 self.autoscaler_check_point_path = os.path.join("output", "autoscaler.pkl")
             else:
@@ -79,16 +81,21 @@ class VibrationML:
         if prev_window == None:
             prev_window = len(self.all_training_dataset_windows)
         
-        training_data = self.all_training_dataset_windows[-prev_window:]
+        training_data_windows = self.all_training_dataset_windows[-prev_window:]
+        # print(type(training_data), len(training_data))
+        # print(training_data[0])
         X = []
         Y = []
-        for td in training_data:
-            (x, y, t) = td
-            X.append(x)
-            Y.append(y)
+        for data_window in training_data_windows:
+            for data in data_window:
+                (x, y) = data
+                X.append(x)
+                Y.append(y)
         # print(len(X), len(training_data))
-        X_train = pd.concat(X)
-        y_train = pd.concat(Y)
+        # X_train = pd.concat(X)
+        # y_train = pd.concat(Y)
+        X_train = pd.DataFrame(X)
+        y_train = Y
         # print(len(X_train), len(y_train))
         return (X_train, y_train)
 
@@ -155,6 +162,8 @@ class VibrationML:
 
     def finetune_model(self, prev_data_windows=None):
         X_train, y_train = self.get_training_dataset(prev_window=prev_data_windows)
+        print(type(X_train))
+        print(X_train)
 
         if(self.model_name == "LSTM_Forecast"):
             y_train = y_train.tolist()
@@ -178,7 +187,8 @@ class VibrationML:
 
 
     def make_prediction(self, X_test):
-        X_test_normalized = self.get_normalized_test_data(X_test)
+        X_test_df = pd.DataFrame(X_test)
+        X_test_normalized = self.get_normalized_test_data(X_test_df)
         if(self.model_name == "LR" or self.model_name=="RF"):
             y_pred = self.model.predict(X_test_normalized)
         if(self.model_name == "LSTM"):
@@ -223,7 +233,8 @@ class VibrationML:
         X_train = X_train.copy(deep=True)
         self.autoscaler = StandardScaler()
         self.autoscaler.fit(X_train)
-        X_train[Util.FEATURES] = self.autoscaler.transform(X_train[Util.FEATURES])
+        # X_train[Util.FEATURES] = self.autoscaler.transform(X_train[Util.FEATURES])
+        X_train = self.autoscaler.transform(X_train)
         Util.static_save_obj(self.autoscaler, self.autoscaler_check_point_path)
         # X_test[feature_columns] = autoscaler.transform(X_test[feature_columns])
         return X_train
@@ -232,7 +243,8 @@ class VibrationML:
         X_test = X_test.copy(deep=True)
         if self.autoscaler is None:
             self.autoscaler = Util.static_load_obj(self.autoscaler_check_point_path)
-        X_test[Util.FEATURES] = self.autoscaler.transform(X_test[Util.FEATURES])
+        X_test = self.autoscaler.transform(X_test)
+        # X_test[Util.FEATURES] = self.autoscaler.transform(X_test[Util.FEATURES])
         return X_test
         
     def LSTM_compile_and_fit(self, train_ds, max_epochs = 100, patience=2):
