@@ -149,9 +149,9 @@ class VibrationML:
 
         return model
 
-    def save_model_weights(self, model_path=None):
-        if(model_path is not None):
-            self.model_check_point_path = model_path
+    def save_model_weights(self, model_save_path=None):
+        if(model_save_path is not None):
+            self.model_check_point_path = model_save_path
         if(self.model_name == "LR"):
             Util.static_save_obj(self.model, self.model_check_point_path)
         if(self.model_name == "RF"):
