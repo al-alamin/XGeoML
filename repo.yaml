@@ -1,0 +1,14 @@
+schema_version: 1
+summary: A research repository for explainable, data-driven machine learning to assist
+  geothermal drilling.
+state: unknown
+intended_readers:
+- Researchers working on explainable machine learning for geothermal drilling.
+consult_when:
+- Locating the geothermal-drilling research notebook and vibration-prediction component.
+watch_when:
+- Changes to the documented research purpose, AutoXGeoML.ipynb or vibration_prediction/.
+current_capabilities:
+- The top-level README establishes the research purpose; the tree includes AutoXGeoML.ipynb
+  and vibration_prediction/.
+planned_capabilities: []
